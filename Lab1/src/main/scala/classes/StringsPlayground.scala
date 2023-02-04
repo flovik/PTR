@@ -2,6 +2,7 @@ package org.victor
 package classes
 
 import scala.collection.mutable.ListBuffer
+import scala.util.control.Breaks.{break, breakable}
 
 class StringsPlayground {
   private val line1keyboard = "qwertyuiopQWERTYUIOP"
@@ -25,5 +26,33 @@ class StringsPlayground {
     }
 
     result.toList
+  }
+
+  def commonPrefix(list: List[String]): String = {
+    var result = new StringBuilder("")
+    if (list.length == 0) return result.toString()
+    if (list.length == 1) return list(0)
+    result.append(list(0))
+
+    for (i <- 1 until list.length) {
+      val currentWord = list(i)
+
+      breakable {
+        for (j <- 0 until result.length) {
+          if (j >= result.length) break
+          if (j >= currentWord.length) {
+            result.delete(j, result.length)
+            break
+          }
+
+          if (currentWord.charAt(j) != result.charAt(j)) {
+            result.delete(j, result.length)
+            break
+          }
+        }
+      }
+    }
+
+    result.toString()
   }
 }

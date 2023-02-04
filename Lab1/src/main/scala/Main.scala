@@ -66,5 +66,13 @@ object Main {
 
     var ga = new GroupAnagrams;
     println(ga.groupAnagrams(List("eat", "tea", "tan", "ate", "nat", "bat")))
+
+    println(mathClass.toRoman("13"))
+    println(mathClass.toRoman("914"))
+    println(mathClass.toRoman("909"))
+
+    println(str.commonPrefix(List("flower","flow","flight")))
+    println(str.commonPrefix(List("flower","flower","flowers", "flowe", "flowers")))
+    println(str.commonPrefix(List("alpha" , "beta" , "gamma")))
   }
 }
