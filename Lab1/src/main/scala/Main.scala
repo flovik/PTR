@@ -1,6 +1,14 @@
 package org.victor
 
-import classes.{CaesarCipher, GroupAnagrams, HelloWorder, LetterCombinations, ListExtensions, MathClass, StringsPlayground, Translator}
+import classes._
+import week3actors.minimal1.MessagePrinterMain
+import week3actors.minimal1.MessagePrinterMain.PrintAnyMessage
+import week3actors.minimal2.GenericMessagePrinter
+import week3actors.minimal3.SupervisorActor
+import week3actors.minimal3.SupervisorActor.{Command, StartActor}
+import week3actors.minimal4.foo
+
+import akka.actor.typed.ActorSystem
 
 import scala.collection.mutable.ListBuffer
 
@@ -74,5 +82,49 @@ object Main {
     println(str.commonPrefix(List("flower","flow","flight")))
     println(str.commonPrefix(List("flower","flower","flowers", "flowe", "flowers")))
     println(str.commonPrefix(List("alpha" , "beta" , "gamma")))
+
+    // WEEK 3 - an actor is born
+    // in Akka you can't create actors directly
+    // you need to create an actor system that uses spawn() to create actors
+    // it returns a reference called ActorRef that points to the actor
+
+    // actorSystem with a guardian, which is the root of the actor hierarchy
+    // it bootstraps the actor system
+    // it is the entry point to the Akka
+    val messagePrinterSystem: ActorSystem[PrintAnyMessage] = ActorSystem(MessagePrinterMain(), "MessagePrinterSystem")
+
+    // actors are reactive and message driven
+    // an actor won't do anything until it receives a message
+    // actors communicate using asynchronous message passing
+    // the sender puts the message in the mailbox of the receiver
+    // and is free to continue doing other work
+    // the actor's mailbox is a queue of messages
+    // the order is preserved, but can be interleaved with messages from other actors
+    // when actor doesn't have any work to do, it is in suspended state when doesn't consume resources
+    // the following commands puts a message in the mailbox of the actor
+    // messagePrinterSystem sends a message MessagePrinterMain
+    messagePrinterSystem ! PrintAnyMessage("Hello PTR!")
+    messagePrinterSystem ! PrintAnyMessage("Hello Week3!")
+    messagePrinterSystem ! PrintAnyMessage("Hello the new Actor!")
+
+    val genericSystem: ActorSystem[Any] = ActorSystem(GenericMessagePrinter(), "GenericMessagePrinter")
+    genericSystem ! 10
+    genericSystem ! "Hello"
+    genericSystem ! true
+    genericSystem ! 10.5
+    genericSystem ! List(1, 2, 3, 4, 5)
+
+    // actors can watch other actors
+    // if the watched actor terminates, the watcher will be notified
+    val watcher: ActorSystem[Command] = ActorSystem(SupervisorActor(), "SupervisorActor")
+    watcher ! StartActor("Pechea", "Hello Pechea!")
+
+    // change internal state of the actors
+    val internal: ActorSystem[Double] = ActorSystem(foo(), "foo")
+    internal ! 10
+    internal ! 10
+    internal ! 10
+    internal ! 10
+    internal ! 10
   }
 }
