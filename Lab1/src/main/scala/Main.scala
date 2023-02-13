@@ -1,6 +1,8 @@
 package org.victor
 
 import classes._
+import week3actors.main1.QueueSupervisor.{new_queue, pop, push}
+import week3actors.main2.SemaphoreSupervisor.{acquire, new_semaphore, release}
 import week3actors.minimal1.MessagePrinterMain
 import week3actors.minimal1.MessagePrinterMain.PrintAnyMessage
 import week3actors.minimal2.GenericMessagePrinter
@@ -126,5 +128,20 @@ object Main {
     internal ! 10
     internal ! 10
     internal ! 10
+
+    val queue = new_queue()
+    push(queue, 42)
+    push(queue, 54)
+    pop(queue)
+    push(queue, 30)
+    pop(queue)
+    pop(queue)
+    pop(queue)
+
+    // semaphore
+    val mutex = new_semaphore(3)
+    acquire(mutex)
+    // critical section
+    release(mutex)
   }
 }
