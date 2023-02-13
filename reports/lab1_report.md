@@ -438,6 +438,279 @@ result string characters, when a character doesn't match, the result substring i
 I have predefined map of all possible combinations of integers to roman characters that can be. The list with roman characters as **integers** is iterated so we get 
 every single possibility of the resulting roman number. If current roman number is lower than n, append the current roman number to the resulting string. 
 
+## P0W2 - An Actor is Born
+
+**Task1** -- *Minimal Task* - Create an actor that prints on the screen any message it receives.
+
+```scala
+object MessagePrinter {
+  final case class PrintMessage(message: String)
+
+  def apply(): Behavior[PrintMessage] = Behaviors.receive { (context, message) =>
+    context.log.info(message.message)
+    Behaviors.same
+  }
+} 
+
+object MessagePrinterMain {
+  final case class PrintAnyMessage(message: String)
+
+  def apply(): Behavior[PrintAnyMessage] =
+    Behaviors.setup { context =>
+      val printer = context.spawn(MessagePrinter(), "printer")
+
+      Behaviors.receiveMessage { message =>
+        printer ! MessagePrinter.PrintMessage(message.message)
+        Behaviors.same
+      }
+    }
+} 
+```
+
+The first minimal task of week 3. Here I have an actor MessagePrinter that has a behavior to print messages. The apply() method is a factory method that creates an instance of the 'Behavior' MessagePrinter. In my case, PrintMessage actor reacts only to behaviors of type 'PrintMessage'. The actor handles the incoming message using Behaviors.receive method, the function takes an incoming message and logs it. Then returns Behaviors.same, which means the internal state of the actor hadn't changed.
+
+Another class MessagePrinterMain has another message signature PrintAnyMessage and accepts only messages of that type. The reason behind that actor is to create the MessagePrinter actor and forward the message to it.
+
+**Task2** -- *Minimal Task* - Create an actor that returns any message it receives, while modifying it.
+
+```scala
+object GenericMessagePrinter {
+  def apply(): Behavior[Any] = Behaviors.setup { context =>
+    Behaviors.receiveMessage {
+      case message: Int =>
+        val res = message + 1
+        context.log.info(s"Received: $res")
+        Behaviors.same
+      case message: String =>
+        val res = message.toLowerCase()
+        context.log.info(s"Received: $res")
+        Behaviors.same
+      case _ =>
+        context.log.info {
+          "Received : I don ’ t know how to HANDLE this !"
+        }
+        Behaviors.same
+    }
+  }
+}
+```
+
+The actor 'GenericMessagePrinter' takes as input message Any data type, which means Any is the root of the Scala class hierarchy and takes any data type. Here I process the message using pattern matching and check of which type is the message. Int and String are only handled accordingly, other data types can't be handled.
+
+**Task3** -- *Minimal Task* - Create a two actors, actor one ”monitoring” the other. If the second actor stops, actor one gets notified via a message
+
+```scala
+object WorkerActor {
+  sealed trait Command
+  final case class DoWork(message: String) extends Command
+
+  def apply(name: String): Behavior[Command] = Behaviors
+    .receive[Command]((context, message) => {
+      message match {
+        case DoWork(message) =>
+          context.log.info("Worker {} received message {}", name, message)
+          Behaviors.stopped
+      }
+    })
+    .receiveSignal {
+      case (context, PostStop) =>
+        context.log.info("Worker {} stopped", name)
+        Behaviors.same
+    }
+}
+
+object SupervisorActor {
+  sealed trait Command
+  final case class StartActor(name: String, message: String) extends Command
+
+  def apply(): Behavior[Command] = Behaviors.
+    receive[Command] { (context, message) =>
+      message match {
+        case StartActor(name, message) =>
+          context.log.info("Starting actor {}", name)
+          val child = context.spawn(WorkerActor(name), name)
+          context.watch(child)
+          child ! WorkerActor.DoWork(message)
+          Behaviors.same
+      }
+    }
+    .receiveSignal({
+      case (context, Terminated(ref)) =>
+        context.log.info("Actor {} terminated", ref.path.name)
+        Behaviors.same
+    })
+}
+```
+
+The actor WorkerActor receives messages of type *Command* and prints any input it gets. Then actor is stopped by the *Behavior.stopped* which is then handled by the 
+*.receiveSignal* which informs that actor has been stopped. The actor SupervisorActor takes messages of type *Command*. When the actor receives a message, it spawn the WorkerActor and watches when the WorkerActor, the SupervisorActor will receive a notification when the WorkerActor is Terminated. That notification is handled with the *.receiveSignal* and logs the name of the Worker that was stopped. 
+
+**Task4** -- *Minimal Task* - Create an actor which receives numbers and with each request prints out the current average.
+
+```scala
+object averager {
+  sealed trait mathCommand
+  final case class CalculateAverage(number: Double) extends mathCommand
+
+  def apply(numbers: ListBuffer[Double]): Behavior[mathCommand] = Behaviors
+    .receive[mathCommand]((context, message) => {
+      message match {
+        case CalculateAverage(number) =>
+          val average = (numbers.sum + number) / 2
+          context.log.info(s"Current average is $average")
+          numbers.update(0, average)
+          Behaviors.same
+      }
+    })
+}
+
+object foo {
+  sealed trait mathCommand
+  final case class CalculateAverage(number: Double) extends mathCommand
+
+  def apply(): Behavior[Double] = Behaviors
+    .setup({ context =>
+      val averageCalculator = context.spawn(averager(ListBuffer(0)), "averageCalculator")
+      context.watch(averageCalculator)
+      averageCalculator ! averager.CalculateAverage(0)
+
+      Behaviors
+        .receiveMessage({ message =>
+          averageCalculator ! averager.CalculateAverage(message)
+          Behaviors.same
+        })
+  })
+}
+```
+
+That task introduces the concept of internal state of an actor. The variables defined inside the apply method are part of the internal state of an actor, in my case the numbers ListBuffer is a variable from the internal state of the average actor. When a message is received by an actor and processed by the apply method, the actor can update its internal state by modifying these variables, and here I calculate the average of the two numbers and update the list with the new average. The updated state will be available for the next message processing. This allows actors to maintain state between message processing, making it possible to implement stateful behavior. The object foo is an actor that creates averager actors and forwards the incoming messages to them. 
+
+**Task5** -- *Main Task* - Create an actor which maintains a simple FIFO queue. You should write helper functions to create an API for the user, which hides how the queue is implemented.
+
+```scala
+object QueueActor {
+  sealed trait queueCommand
+  sealed trait queueResponse
+  final case class Enqueue(x: Int, replyTo: ActorRef[Message]) extends queueCommand
+  final case class Dequeue(replyTo: ActorRef[DequeueResult]) extends queueCommand
+  final case class Message(message: String) extends queueResponse
+  final case class DequeueResult(num: Option[Int]) extends queueResponse
+
+  def apply(queue: ListBuffer[Int]): Behavior[queueCommand] = Behaviors.receive { (context, message) =>
+    message match {
+      case Enqueue(x, replyTo) =>
+        queue.append(x)
+        replyTo ! Message("ok")
+        QueueActor(queue)
+      case Dequeue(replyTo) =>
+        val result = if (queue.nonEmpty) {
+          val head = queue.head
+          val newQueue = queue.tail
+          replyTo ! DequeueResult(Some(head))
+          newQueue
+        } else {
+          replyTo ! DequeueResult(None)
+          queue
+        }
+        QueueActor(result)
+    }
+  }
+}
+
+object QueueSupervisor {
+  val replyTo: ActorRef[QueueActor.queueResponse] = ActorSystem(QueueSupervisor(), "queue")
+
+  def new_queue(): ActorRef[QueueActor.queueCommand] = {
+    val queue = ListBuffer.empty[Int]
+    ActorSystem(QueueActor(queue), "queue")
+  }
+  def push(queue: ActorRef[QueueActor.queueCommand], x: Int): Unit = {
+    queue ! QueueActor.Enqueue(x, replyTo)
+  }
+
+  def pop(queue: ActorRef[QueueActor.queueCommand]): Unit = {
+    queue ! QueueActor.Dequeue(replyTo)
+  }
+
+  private def apply(): Behavior[QueueActor.queueResponse] = Behaviors.setup { context =>
+    Behaviors.receiveMessage[QueueActor.queueResponse] {
+      case QueueActor.Message(message) =>
+        context.log.info(message)
+        Behaviors.same
+      case QueueActor.DequeueResult(num) =>
+        num match {
+          case Some(number) => context.log.info(number.toString)
+          case None => context.log.info("Queue is empty.")
+        }
+        Behaviors.same
+    }
+  }
+}
+```
+
+Here I had to implement a simple FIFO queue and to create an API to hide how the queue is implemented. I used a listBuffer to implement the internal queue of the actor. When a queueCommand is received, I apply pattern matching to see what message I received -> of Enqueuing or Dequeuing. In the Enqueue message I get the value that should be enqueued and reference to the Actor the queueActor should reply to. The value is added, a success message is transmitted and I return the current queue with the updated value as a Behavior response. The Dequeue message takes as input the receiver of the DequeueResult which contains the optional dequeued value. I check if the queue is empty, if it is I return None, if it is not the first value is returned and the queue is updated without the dequeued value. 
+
+QueueSupervisor is the API between the user and the Queue actor. I defined three methods: new_queue() that return the ActorRef of the QueueActor, push(queue, x) which sends a message to enqueue some value and pop(queue) to dequeue a value. I have a reference for the current QueueSupervisor so he can get messages back from QueueActor. QueueSupervisor receives only queueResponse messages from the QueueActor, and by doing pattern matching of the incoming message, I log the information if the values was pushed or popped successfully. 
+
+**Task6** -- *Main Task* - Create a module that would implement a semaphore
+
+```scala
+object Semaphore {
+  sealed trait semaphoreCommand
+  final case class Acquire(replyTo: ActorRef[Response]) extends semaphoreCommand
+  final case class Release(replyTo: ActorRef[Response]) extends semaphoreCommand
+  final case class Response(initialCount: Int)
+
+  def apply(initialCount: Int, maximumValue: Int = 5): Behavior[semaphoreCommand] = Behaviors.receive { (context, message) =>
+    message match {
+      case Acquire(replyTo) =>
+        if (initialCount > 0) {
+          val newCount = initialCount - 1
+          replyTo ! Response(newCount)
+          Semaphore(newCount)
+        } else {
+          Behaviors.same
+        }
+      case Release(replyTo) =>
+        if (initialCount < maximumValue) {
+          val newCount = initialCount + 1
+          replyTo ! Response(newCount)
+          Semaphore(newCount)
+        } else {
+          Behaviors.same
+        }
+    }
+  }
+}
+
+object SemaphoreSupervisor {
+  val replyTo: ActorRef[Semaphore.Response] = ActorSystem(SemaphoreSupervisor(), "semaphore")
+
+  def new_semaphore(count: Int): ActorRef[Semaphore.semaphoreCommand] = {
+    ActorSystem(Semaphore(count), "semaphore")
+  }
+
+  def acquire(semaphore: ActorRef[Semaphore.semaphoreCommand]): Unit = {
+    semaphore ! Semaphore.Acquire(replyTo)
+  }
+
+  def release(semaphore: ActorRef[Semaphore.semaphoreCommand]): Unit = {
+    semaphore ! Semaphore.Release(replyTo)
+  }
+
+  private def apply(): Behavior[Semaphore.Response] = Behaviors.setup { context =>
+    Behaviors.receiveMessage[Semaphore.Response] {
+      case Semaphore.Response(count) =>
+        context.log.info(count.toString)
+        Behaviors.same
+    }
+  }
+}
+
+```
+
+Here I applied the same approach as in the previous task, implementation of the semaphore is straight-forward, I have an initialCount and a maximumPossible value that can access the critical section. If Acquire is called, I will reduce the initialCount if it is bigger than 0. otherwise I won't touch the internal count. For Release same thing, if maximumCount is reached, the count won't be raised. Considering the nature of actors in Actor/Model, the internal state of the semaphore cannot be changed from outside and each message is processed one at a time. 
+
 ## Conclusion
 
 The first two weeks of the laboratory work nr. 1 are a introduction to the Scala language, by solving problems we get familiar with the language. 
@@ -445,4 +718,9 @@ The first two weeks of the laboratory work nr. 1 are a introduction to the Scala
 ## Bibliography
 
 https://docs.scala-lang.org/tour/tour-of-scala.html
+
 https://docs.scala-lang.org/getting-started/intellij-track/getting-started-with-scala-in-intellij.html
+
+https://developer.lightbend.com/guides/akka-quickstart-scala/index.html
+
+https://doc.akka.io/docs/akka/current/typed/guide/introduction.html
