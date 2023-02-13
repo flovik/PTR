@@ -714,6 +714,7 @@ Here I applied the same approach as in the previous task, implementation of the 
 ## Conclusion
 
 The first two weeks of the laboratory work nr. 1 are a introduction to the Scala language, by solving problems we get familiar with the language. 
+The third week made me familiar with the actor model, each task slowly explains how things work, how messages are passed between actors, how the internal state is handled, how actors can watch other actors and be notfied. 
 
 ## Bibliography
 
