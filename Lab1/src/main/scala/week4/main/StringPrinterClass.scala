@@ -14,6 +14,9 @@ class StringPrinterClass extends Actor with ActorLogging {
   override def receive: Receive = {
     case StringPrinter.PrintMessage(message) =>
       log.info(message)
+  }
 
+  override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
+    log.info("Restarting StringPrinterClass")
   }
 }

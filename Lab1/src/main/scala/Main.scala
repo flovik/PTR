@@ -1,8 +1,10 @@
 package org.victor
 
 import classes._
-import week4.main.StringSupervisor
-import week4.main.StringSupervisor.{CleanMessage, CleanString}
+
+import org.victor.week4.main.StringSupervisorObject
+//import week4.main.StringSupervisor
+//import week4.main.StringSupervisor.{CleanMessage, CleanString}
 import week4.minimal.{EchoActorObject}
 
 import akka.actor
@@ -159,12 +161,13 @@ object Main {
     workers.head.ref ! EchoActorObject.Echo("Hello")
 
     // main task
-    val supervisor: actor.typed.ActorSystem[CleanString] = actor.typed.ActorSystem(StringSupervisor(), "mainTaskSupervisor")
+    val system1 = actor.ActorSystem("StringSupervisor")
+    val stringSupervisor = system1.actorOf(week4.main.StringSupervisorObject.props(), "supervisor")
 
-    supervisor ! CleanMessage("This a tEsting   striNg that coNtaIns s  sOme m's and n's nnnn mmmmm monster!")
+    stringSupervisor ! StringSupervisorObject.SendMessage("This a tEsting   striNg that coNtaIns s  sOme m's and n's nnnn mmmmm monster!")
     Thread.sleep(1500)
-    supervisor ! CleanMessage("This a tEsting   striNg that coNtaIns s  sOme m's and n's nnnn mmmmm monster!@")
+    stringSupervisor ! StringSupervisorObject.SendMessage("This a tEsting   striNg that coNtaIns s  sOme m's and n's nnnn mmmmm monster!@")
     Thread.sleep(3500)
-    supervisor ! CleanMessage("This a tEsting   striNg that coNtaIns s  sOme m's and n's nnnn mmmmm monster!")
+    stringSupervisor ! StringSupervisorObject.SendMessage("This a tEsting   striNg that coNtaIns s  sOme m's and n's nnnn mmmmm monster!")
   }
 }
