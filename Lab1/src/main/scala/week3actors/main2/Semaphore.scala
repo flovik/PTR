@@ -13,14 +13,17 @@ object Semaphore {
 
   final case class Response(initialCount: Int)
 
-  def apply(initialCount: Int, maximumValue: Int = 5): Behavior[semaphoreCommand] = Behaviors.receive { (context, message) =>
+  def apply(initialCount: Int, maximumValue: Int = 3): Behavior[semaphoreCommand] = Behaviors.receive { (context, message) =>
     message match {
       case Acquire(replyTo) =>
         if (initialCount > 0) {
           val newCount = initialCount - 1
+          context.log.info("Semaphore is still available");
+          context.log.info(context.self.path.toString)
           replyTo ! Response(newCount)
           Semaphore(newCount)
         } else {
+          context.log.info("Semaphore is empty");
           Behaviors.same
         }
       case Release(replyTo) =>

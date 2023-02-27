@@ -8,9 +8,6 @@ import scala.collection.mutable.ListBuffer
 
 object averager {
 
-  sealed trait mathCommand
-  final case class CalculateAverage(number: Double) extends mathCommand
-
   def apply(numbers: ListBuffer[Double]): Behavior[mathCommand] = Behaviors
     .receive[mathCommand]((context, message) => {
       message match {
@@ -21,4 +18,8 @@ object averager {
           Behaviors.same
       }
     })
+
+  sealed trait mathCommand
+
+  final case class CalculateAverage(number: Double) extends mathCommand
 }

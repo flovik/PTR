@@ -23,6 +23,7 @@ object SemaphoreSupervisor {
     Behaviors.receiveMessage[Semaphore.Response] {
       case Semaphore.Response(count) =>
         context.log.info(count.toString)
+        context.log.info(context.self.path.toString)
         Behaviors.same
     }
   }

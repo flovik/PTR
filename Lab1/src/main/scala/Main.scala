@@ -1,18 +1,18 @@
 package org.victor
 
 import classes._
-import week3actors.main1.QueueSupervisor.{new_queue, pop, push}
-import week3actors.main2.SemaphoreSupervisor.{acquire, new_semaphore, release}
-import week3actors.minimal1.MessagePrinterMain
-import week3actors.minimal1.MessagePrinterMain.PrintAnyMessage
-import week3actors.minimal2.GenericMessagePrinter
-import week3actors.minimal3.SupervisorActor
-import week3actors.minimal3.SupervisorActor.{Command, StartActor}
-import week3actors.minimal4.foo
+import week4.main.StringSupervisor
+import week4.main.StringSupervisor.{CleanMessage, CleanString}
+import week4.minimal.{EchoActorObject}
 
-import akka.actor.typed.ActorSystem
+import akka.actor
+import akka.pattern.ask
+import akka.routing.ActorRefRoutee
+import akka.util.Timeout
 
 import scala.collection.mutable.ListBuffer
+import scala.concurrent.Await
+import scala.concurrent.duration.DurationInt
 
 object Main {
   def main(args: Array[String]): Unit = {
@@ -60,11 +60,11 @@ object Main {
     println(mathClass.listRightAngleTriangles)
 
     println(listExtensions.removeConsecutiveDuplicates(List(1, 2, 2, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 5)))
-    println(listExtensions.removeConsecutiveDuplicates(List(1 , 1, 1, 1, 2 , 2 , 2 , 4 , 8 , 4)))
+    println(listExtensions.removeConsecutiveDuplicates(List(1, 1, 1, 1, 2, 2, 2, 4, 8, 4)))
     println(listExtensions.removeConsecutiveDuplicates(List()))
 
     val str = new StringsPlayground;
-    println(str.lineWords(List(" Hello " ," Alaska " ," Dad " ," Peace ")))
+    println(str.lineWords(List(" Hello ", " Alaska ", " Dad ", " Peace ")))
 
     var caesar = new CaesarCipher
     println(caesar.encrypt("lorem", 3))
@@ -81,9 +81,9 @@ object Main {
     println(mathClass.toRoman("914"))
     println(mathClass.toRoman("909"))
 
-    println(str.commonPrefix(List("flower","flow","flight")))
-    println(str.commonPrefix(List("flower","flower","flowers", "flowe", "flowers")))
-    println(str.commonPrefix(List("alpha" , "beta" , "gamma")))
+    println(str.commonPrefix(List("flower", "flow", "flight")))
+    println(str.commonPrefix(List("flower", "flower", "flowers", "flowe", "flowers")))
+    println(str.commonPrefix(List("alpha", "beta", "gamma")))
 
     // WEEK 3 - an actor is born
     // in Akka you can't create actors directly
@@ -93,7 +93,7 @@ object Main {
     // actorSystem with a guardian, which is the root of the actor hierarchy
     // it bootstraps the actor system
     // it is the entry point to the Akka
-    val messagePrinterSystem: ActorSystem[PrintAnyMessage] = ActorSystem(MessagePrinterMain(), "MessagePrinterSystem")
+    //    val messagePrinterSystem: actor.typed.ActorSystem[PrintAnyMessage] = actor.typed.ActorSystem(MessagePrinterMain(), "MessagePrinterSystem")
 
     // actors are reactive and message driven
     // an actor won't do anything until it receives a message
@@ -105,43 +105,66 @@ object Main {
     // when actor doesn't have any work to do, it is in suspended state when doesn't consume resources
     // the following commands puts a message in the mailbox of the actor
     // messagePrinterSystem sends a message MessagePrinterMain
-    messagePrinterSystem ! PrintAnyMessage("Hello PTR!")
-    messagePrinterSystem ! PrintAnyMessage("Hello Week3!")
-    messagePrinterSystem ! PrintAnyMessage("Hello the new Actor!")
-
-    val genericSystem: ActorSystem[Any] = ActorSystem(GenericMessagePrinter(), "GenericMessagePrinter")
-    genericSystem ! 10
-    genericSystem ! "Hello"
-    genericSystem ! true
-    genericSystem ! 10.5
-    genericSystem ! List(1, 2, 3, 4, 5)
+    //    messagePrinterSystem ! PrintAnyMessage("Hello PTR!")
+    //    messagePrinterSystem ! PrintAnyMessage("Hello Week3!")
+    //    messagePrinterSystem ! PrintAnyMessage("Hello the new Actor!")
+    //
+    //    val genericSystem: ActorSystem[Any] = ActorSystem(GenericMessagePrinter(), "GenericMessagePrinter")
+    //    genericSystem ! 10
+    //    genericSystem ! "Hello"
+    //    genericSystem ! true
+    //    genericSystem ! 10.5
+    //    genericSystem ! List(1, 2, 3, 4, 5)
 
     // actors can watch other actors
     // if the watched actor terminates, the watcher will be notified
-    val watcher: ActorSystem[Command] = ActorSystem(SupervisorActor(), "SupervisorActor")
-    watcher ! StartActor("Pechea", "Hello Pechea!")
+    //    val watcher: ActorSystem[Command] = ActorSystem(SupervisorActor(), "SupervisorActor")
+    //    watcher ! StartActor("Pechea", "Hello Pechea!")
+    //
+    //    // change internal state of the actors
+    //    val internal: ActorSystem[Double] = ActorSystem(foo(), "foo")
+    //    internal ! 10
+    //    internal ! 10
+    //    internal ! 10
+    //    internal ! 10
+    //    internal ! 10
 
-    // change internal state of the actors
-    val internal: ActorSystem[Double] = ActorSystem(foo(), "foo")
-    internal ! 10
-    internal ! 10
-    internal ! 10
-    internal ! 10
-    internal ! 10
+    //    val queue = new_queue()
+    //    push(queue, 42)
+    //    push(queue, 54)
+    //    pop(queue)
+    //    push(queue, 30)
+    //    pop(queue)
+    //    pop(queue)
+    //    pop(queue)
+    //
+    //    // semaphore
+    //    val mutex = new_semaphore(1)
+    //    acquire(mutex)
+    //    acquire(mutex)
+    //    // critical section
+    //    release(mutex)
 
-    val queue = new_queue()
-    push(queue, 42)
-    push(queue, 54)
-    pop(queue)
-    push(queue, 30)
-    pop(queue)
-    pop(queue)
-    pop(queue)
+    // week 4
 
-    // semaphore
-    val mutex = new_semaphore(3)
-    acquire(mutex)
-    // critical section
-    release(mutex)
+    val system = actor.ActorSystem("EchoActorSupervisor")
+    val week4supervisor = system.actorOf(week4.minimal.SupervisorActor.props(), "supervisor")
+
+    implicit val timeout: Timeout = Timeout(5.seconds)
+    val future = week4supervisor ? week4.minimal.SupervisorActor.SendWorkers
+    val workers = Await.result(future, timeout.duration).asInstanceOf[Vector[ActorRefRoutee]]
+
+    workers.head.ref ! EchoActorObject.Echo("Hello")
+    workers.head.ref ! EchoActorObject.Kill
+    workers.head.ref ! EchoActorObject.Echo("Hello")
+
+    // main task
+    val supervisor: actor.typed.ActorSystem[CleanString] = actor.typed.ActorSystem(StringSupervisor(), "mainTaskSupervisor")
+
+    supervisor ! CleanMessage("This a tEsting   striNg that coNtaIns s  sOme m's and n's nnnn mmmmm monster!")
+    Thread.sleep(1500)
+    supervisor ! CleanMessage("This a tEsting   striNg that coNtaIns s  sOme m's and n's nnnn mmmmm monster!@")
+    Thread.sleep(3500)
+    supervisor ! CleanMessage("This a tEsting   striNg that coNtaIns s  sOme m's and n's nnnn mmmmm monster!")
   }
 }
