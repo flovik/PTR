@@ -2,19 +2,11 @@ package org.victor
 
 import classes._
 
-import org.victor.week4.main.StringSupervisorObject
+import akka.actor
+import org.victor.week5.minimal.PageVisitorClass
 //import week4.main.StringSupervisor
 //import week4.main.StringSupervisor.{CleanMessage, CleanString}
-import week4.minimal.{EchoActorObject}
-
-import akka.actor
-import akka.pattern.ask
-import akka.routing.ActorRefRoutee
-import akka.util.Timeout
-
 import scala.collection.mutable.ListBuffer
-import scala.concurrent.Await
-import scala.concurrent.duration.DurationInt
 
 object Main {
   def main(args: Array[String]): Unit = {
@@ -149,25 +141,33 @@ object Main {
 
     // week 4
 
-    val system = actor.ActorSystem("EchoActorSupervisor")
-    val week4supervisor = system.actorOf(week4.minimal.SupervisorActor.props(), "supervisor")
+    //    val system = actor.ActorSystem("EchoActorSupervisor")
+    //    val week4supervisor = system.actorOf(week4.minimal.SupervisorActor.props(), "supervisor")
+    //
+    //    implicit val timeout: Timeout = Timeout(5.seconds)
+    //    val future = week4supervisor ? week4.minimal.SupervisorActor.SendWorkers
+    //    val workers = Await.result(future, timeout.duration).asInstanceOf[Vector[ActorRefRoutee]]
+    //
+    //    workers.head.ref ! EchoActorObject.Echo("Hello")
+    //    workers.head.ref ! EchoActorObject.Kill
+    //    workers.head.ref ! EchoActorObject.Echo("Hello")
+    //
+    //    // main task
+    //    val system1 = actor.ActorSystem("StringSupervisor")
+    //    val stringSupervisor = system1.actorOf(week4.main.StringSupervisorObject.props(), "supervisor")
+    //
+    //    stringSupervisor ! StringSupervisorObject.SendMessage("This a tEsting   striNg that coNtaIns s  sOme m's and n's nnnn mmmmm monster!")
+    //    Thread.sleep(1500)
+    //    stringSupervisor ! StringSupervisorObject.SendMessage("This a tEsting   striNg that coNtaIns s  sOme m's and n's nnnn mmmmm monster!@")
+    //    Thread.sleep(3500)
+    //    stringSupervisor ! StringSupervisorObject.SendMessage("This a tEsting   striNg that coNtaIns s  sOme m's and n's nnnn mmmmm monster!")
 
-    implicit val timeout: Timeout = Timeout(5.seconds)
-    val future = week4supervisor ? week4.minimal.SupervisorActor.SendWorkers
-    val workers = Await.result(future, timeout.duration).asInstanceOf[Vector[ActorRefRoutee]]
+    // week 5
 
-    workers.head.ref ! EchoActorObject.Echo("Hello")
-    workers.head.ref ! EchoActorObject.Kill
-    workers.head.ref ! EchoActorObject.Echo("Hello")
+    val system = actor.ActorSystem("QuoteActorSupervisor")
 
-    // main task
-    val system1 = actor.ActorSystem("StringSupervisor")
-    val stringSupervisor = system1.actorOf(week4.main.StringSupervisorObject.props(), "supervisor")
+    val quoteSupervisor = system.actorOf(week5.minimal.PageVisitorClass.props(), "supervisor")
 
-    stringSupervisor ! StringSupervisorObject.SendMessage("This a tEsting   striNg that coNtaIns s  sOme m's and n's nnnn mmmmm monster!")
-    Thread.sleep(1500)
-    stringSupervisor ! StringSupervisorObject.SendMessage("This a tEsting   striNg that coNtaIns s  sOme m's and n's nnnn mmmmm monster!@")
-    Thread.sleep(3500)
-    stringSupervisor ! StringSupervisorObject.SendMessage("This a tEsting   striNg that coNtaIns s  sOme m's and n's nnnn mmmmm monster!")
+    quoteSupervisor ! PageVisitorClass.VisitPage("https://quotes.toscrape.com/")
   }
 }

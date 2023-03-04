@@ -34,6 +34,8 @@ class StringSupervisor extends Actor with ActorLogging {
       for (r <- newRoutees) {
         router.addRoutee(r)
       }
+
+      routees = newRoutees
   }
 
   private def createRoutees(): IndexedSeq[ActorRefRoutee] = {
