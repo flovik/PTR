@@ -3,6 +3,7 @@ package org.victor
 import classes._
 
 import akka.actor
+import com.typesafe.config.ConfigFactory
 import org.victor.week5.minimal.PageVisitorClass
 //import week4.main.StringSupervisor
 //import week4.main.StringSupervisor.{CleanMessage, CleanString}
@@ -169,5 +170,15 @@ object Main {
     val quoteSupervisor = system.actorOf(week5.minimal.PageVisitorClass.props(), "supervisor")
 
     quoteSupervisor ! PageVisitorClass.VisitPage("https://quotes.toscrape.com/")
+
+    // main
+    // docker run -p 6379:6379 -it redis/redis-stack:latest
+    val system1 = actor.ActorSystem("StarWarsActorSupervisor")
+
+    val config = ConfigFactory.load()
+    val host = config.getString("http.host")
+    val port = config.getInt("http.port")
+
+    system1.actorOf(week5.main.StarwarsAPI.props(host, port), "supervisor")
   }
 }
