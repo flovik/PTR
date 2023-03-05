@@ -499,11 +499,8 @@ The actor 'GenericMessagePrinter' takes as input message Any data type, which me
 
 **Task3** -- *Minimal Task* - Create a two actors, actor one ”monitoring” the other. If the second actor stops, actor one gets notified via a message
 
+Child Actor
 ```scala
-object WorkerActor {
-  sealed trait Command
-  final case class DoWork(message: String) extends Command
-
   def apply(name: String): Behavior[Command] = Behaviors
     .receive[Command]((context, message) => {
       message match {
@@ -511,34 +508,17 @@ object WorkerActor {
           context.log.info("Worker {} received message {}", name, message)
           Behaviors.stopped
       }
-    })
-    .receiveSignal {
-      case (context, PostStop) =>
-        context.log.info("Worker {} stopped", name)
-        Behaviors.same
     }
-}
+```
 
-object SupervisorActor {
-  sealed trait Command
-  final case class StartActor(name: String, message: String) extends Command
-
-  def apply(): Behavior[Command] = Behaviors.
-    receive[Command] { (context, message) =>
-      message match {
-        case StartActor(name, message) =>
-          context.log.info("Starting actor {}", name)
-          val child = context.spawn(WorkerActor(name), name)
-          context.watch(child)
-          child ! WorkerActor.DoWork(message)
-          Behaviors.same
-      }
-    }
-    .receiveSignal({
-      case (context, Terminated(ref)) =>
-        context.log.info("Actor {} terminated", ref.path.name)
-        Behaviors.same
-    })
+Monitoring actor
+```scala
+case StartActor(name, message) =>
+  context.log.info("Starting actor {}", name)
+  val child = context.spawn(WorkerActor(name), name)
+  context.watch(child)
+  child ! WorkerActor.DoWork(message)
+  Behaviors.same 
 }
 ```
 
@@ -547,77 +527,52 @@ The actor WorkerActor receives messages of type *Command* and prints any input i
 
 **Task4** -- *Minimal Task* - Create an actor which receives numbers and with each request prints out the current average.
 
+Averager
 ```scala
-object averager {
-  sealed trait mathCommand
-  final case class CalculateAverage(number: Double) extends mathCommand
+val average = (numbers.sum + number) / 2
+context.log.info(s"Current average is $average")
+numbers.update(0, average)
+```
 
-  def apply(numbers: ListBuffer[Double]): Behavior[mathCommand] = Behaviors
-    .receive[mathCommand]((context, message) => {
-      message match {
-        case CalculateAverage(number) =>
-          val average = (numbers.sum + number) / 2
-          context.log.info(s"Current average is $average")
-          numbers.update(0, average)
-          Behaviors.same
-      }
-    })
-}
+AveragerSupervisor
+```scala
+val averageCalculator = context.spawn(averager(ListBuffer(0)), "averageCalculator")
+context.watch(averageCalculator)
+averageCalculator ! averager.CalculateAverage(0)
 
-object foo {
-  sealed trait mathCommand
-  final case class CalculateAverage(number: Double) extends mathCommand
-
-  def apply(): Behavior[Double] = Behaviors
-    .setup({ context =>
-      val averageCalculator = context.spawn(averager(ListBuffer(0)), "averageCalculator")
-      context.watch(averageCalculator)
-      averageCalculator ! averager.CalculateAverage(0)
-
-      Behaviors
-        .receiveMessage({ message =>
-          averageCalculator ! averager.CalculateAverage(message)
-          Behaviors.same
-        })
+Behaviors
+  .receiveMessage({ message =>
+    averageCalculator ! averager.CalculateAverage(message)
+    Behaviors.same
   })
-}
 ```
 
 That task introduces the concept of internal state of an actor. The variables defined inside the apply method are part of the internal state of an actor, in my case the numbers ListBuffer is a variable from the internal state of the average actor. When a message is received by an actor and processed by the apply method, the actor can update its internal state by modifying these variables, and here I calculate the average of the two numbers and update the list with the new average. The updated state will be available for the next message processing. This allows actors to maintain state between message processing, making it possible to implement stateful behavior. The object foo is an actor that creates averager actors and forwards the incoming messages to them. 
 
 **Task5** -- *Main Task* - Create an actor which maintains a simple FIFO queue. You should write helper functions to create an API for the user, which hides how the queue is implemented.
 
+Queue
 ```scala
-object QueueActor {
-  sealed trait queueCommand
-  sealed trait queueResponse
-  final case class Enqueue(x: Int, replyTo: ActorRef[Message]) extends queueCommand
-  final case class Dequeue(replyTo: ActorRef[DequeueResult]) extends queueCommand
-  final case class Message(message: String) extends queueResponse
-  final case class DequeueResult(num: Option[Int]) extends queueResponse
-
-  def apply(queue: ListBuffer[Int]): Behavior[queueCommand] = Behaviors.receive { (context, message) =>
-    message match {
-      case Enqueue(x, replyTo) =>
-        queue.append(x)
-        replyTo ! Message("ok")
-        QueueActor(queue)
-      case Dequeue(replyTo) =>
-        val result = if (queue.nonEmpty) {
-          val head = queue.head
-          val newQueue = queue.tail
-          replyTo ! DequeueResult(Some(head))
-          newQueue
-        } else {
-          replyTo ! DequeueResult(None)
-          queue
-        }
-        QueueActor(result)
-    }
+case Enqueue(x, replyTo) =>
+  queue.append(x)
+  replyTo ! Message("ok")
+  QueueActor(queue)
+case Dequeue(replyTo) =>
+  val result = if (queue.nonEmpty) {
+  val head = queue.head
+  val newQueue = queue.tail
+  replyTo ! DequeueResult(Some(head))
+  newQueue
+  } else {
+    replyTo ! DequeueResult(None)
+    queue
   }
-}
+  QueueActor(result)
 
-object QueueSupervisor {
+```
+
+Queue supervisor
+```scala
   val replyTo: ActorRef[QueueActor.queueResponse] = ActorSystem(QueueSupervisor(), "queue")
 
   def new_queue(): ActorRef[QueueActor.queueCommand] = {
@@ -631,21 +586,6 @@ object QueueSupervisor {
   def pop(queue: ActorRef[QueueActor.queueCommand]): Unit = {
     queue ! QueueActor.Dequeue(replyTo)
   }
-
-  private def apply(): Behavior[QueueActor.queueResponse] = Behaviors.setup { context =>
-    Behaviors.receiveMessage[QueueActor.queueResponse] {
-      case QueueActor.Message(message) =>
-        context.log.info(message)
-        Behaviors.same
-      case QueueActor.DequeueResult(num) =>
-        num match {
-          case Some(number) => context.log.info(number.toString)
-          case None => context.log.info("Queue is empty.")
-        }
-        Behaviors.same
-    }
-  }
-}
 ```
 
 Here I had to implement a simple FIFO queue and to create an API to hide how the queue is implemented. I used a listBuffer to implement the internal queue of the actor. When a queueCommand is received, I apply pattern matching to see what message I received -> of Enqueuing or Dequeuing. In the Enqueue message I get the value that should be enqueued and reference to the Actor the queueActor should reply to. The value is added, a success message is transmitted and I return the current queue with the updated value as a Behavior response. The Dequeue message takes as input the receiver of the DequeueResult which contains the optional dequeued value. I check if the queue is empty, if it is I return None, if it is not the first value is returned and the queue is updated without the dequeued value. 
@@ -654,36 +594,28 @@ QueueSupervisor is the API between the user and the Queue actor. I defined three
 
 **Task6** -- *Main Task* - Create a module that would implement a semaphore
 
+Sempahore
 ```scala
-object Semaphore {
-  sealed trait semaphoreCommand
-  final case class Acquire(replyTo: ActorRef[Response]) extends semaphoreCommand
-  final case class Release(replyTo: ActorRef[Response]) extends semaphoreCommand
-  final case class Response(initialCount: Int)
-
-  def apply(initialCount: Int, maximumValue: Int = 5): Behavior[semaphoreCommand] = Behaviors.receive { (context, message) =>
-    message match {
-      case Acquire(replyTo) =>
-        if (initialCount > 0) {
-          val newCount = initialCount - 1
-          replyTo ! Response(newCount)
-          Semaphore(newCount)
-        } else {
-          Behaviors.same
-        }
-      case Release(replyTo) =>
-        if (initialCount < maximumValue) {
-          val newCount = initialCount + 1
-          replyTo ! Response(newCount)
-          Semaphore(newCount)
-        } else {
-          Behaviors.same
-        }
-    }
+case Acquire(replyTo) =>
+  if (initialCount > 0) {
+    val newCount = initialCount - 1
+    replyTo ! Response(newCount)
+    Semaphore(newCount)
+  } else {
+    Behaviors.same
   }
-}
+case Release(replyTo) =>
+  if (initialCount < maximumValue) {
+    val newCount = initialCount + 1
+    replyTo ! Response(newCount)
+    Semaphore(newCount)
+  } else {
+    Behaviors.same
+  }
+```
 
-object SemaphoreSupervisor {
+Sempahore supervisor
+```scala
   val replyTo: ActorRef[Semaphore.Response] = ActorSystem(SemaphoreSupervisor(), "semaphore")
 
   def new_semaphore(count: Int): ActorRef[Semaphore.semaphoreCommand] = {
@@ -697,24 +629,268 @@ object SemaphoreSupervisor {
   def release(semaphore: ActorRef[Semaphore.semaphoreCommand]): Unit = {
     semaphore ! Semaphore.Release(replyTo)
   }
-
-  private def apply(): Behavior[Semaphore.Response] = Behaviors.setup { context =>
-    Behaviors.receiveMessage[Semaphore.Response] {
-      case Semaphore.Response(count) =>
-        context.log.info(count.toString)
-        Behaviors.same
-    }
-  }
-}
-
 ```
 
 Here I applied the same approach as in the previous task, implementation of the semaphore is straight-forward, I have an initialCount and a maximumPossible value that can access the critical section. If Acquire is called, I will reduce the initialCount if it is bigger than 0. otherwise I won't touch the internal count. For Release same thing, if maximumCount is reached, the count won't be raised. Considering the nature of actors in Actor/Model, the internal state of the semaphore cannot be changed from outside and each message is processed one at a time. 
+
+## P0W4 - The actor is dead.. Long lice the Actor
+
+**Task1** -- *Minimal Task* - Create a supervised pool of identical worker actors. The number of actors
+is static, given at initialization. Workers should be individually addressable. Worker actors
+should echo any message they receive. If an actor dies (by receiving a “kill” message), it should
+be restarted by the supervisor. Logging is welcome.
+
+Echo actor
+```scala
+    case Echo(message) =>
+      log.info("Worker {} received message: {}", name, message)
+      sender() ! s"Worker $name echoed: $message"
+    case Kill =>
+      log.warning("Worker {} received Kill message and will be restarted", name)
+      throw new Exception(s"Worker $name killed")
+```
+
+Echo actor supervisor
+```scala
+  override val supervisorStrategy: SupervisorStrategy =
+    SupervisorStrategy.defaultStrategy
+    
+  private val router: Router = {
+    Router(RoundRobinRoutingLogic(), routees)
+  }
+    
+  private val workerCount = 3
+  private var routees = IndexedSeq.fill(workerCount) {
+    val name = workerName()
+    val r = context.actorOf(EchoActorObject.props(name), name)
+    context.watch(r)
+    ActorRefRoutee(r)
+  }
+  
+  override def receive: Receive = {
+      case SendWorkers =>
+        sender() ! routees
+    case Terminated(ref) =>
+      val index = routees.indexOf(ref.actorRef)
+      routees = routees.patch(index, Nil, 1)
+
+      val name = workerName()
+      val r = context.actorOf(EchoActorObject.props(name), name)
+      context.watch(r)
+      router.removeRoutee(ref)
+      router.addRoutee(ActorRefRoutee(r))
+      }
+```
+
+In that task, I had to implement a supervised pool of identical worker actors. To do that I used the Pool Router which takes as input the message passing logic and the routees in the pool. Number of routees is static and created when the supervisor is created. When a SendWorkers message is coming through, the routees are sent back to the sender and can be individually addressed. When an actor receives a Kill message, it throws an exception and makes the supervisor to restart the 'dead' actor. It is done using the supervision strategy 'OneForOneStrategy' which is the default one. 
+
+**Task2** -- *Main Task* - Create a supervised processing line to clean messy strings. The first worker in
+the line would split the string by any white spaces (similar to Python’s str.split method).
+The second actor will lowercase all words and swap all m’s and n’s (you nomster!). The third
+actor will join back the sentence with one space between words (similar to Python’s str.join
+method). Each worker will receive as input the previous actor’s output, the last actor printing
+the result on screen. If any of the workers die because it encounters an error, the whole
+processing line needs to be restarted. Logging is welcome.
+
+Splitter
+```scala
+if (message.contains('@')) {
+  throw new IllegalArgumentException("Message is empty")
+}
+val words = message.split("\\s+")
+nextActor ! LowercaseAndSwapMessage(words)
+```
+
+Joiner
+```scala
+val joinedWords = message.mkString(" ")
+nextActor ! StringPrinter.PrintMessage(joinedWords)
+```
+
+Lowercaser
+```scala
+val lowercasedWords = words.map(_.toLowerCase)
+val swappedMsWithNs = lowercasedWords.map(str => str.map {
+   case 'm' => 'n'
+   case 'n' => 'm'
+   case c => c
+})
+
+nextActor ! JoinMessage(swappedMsWithNs)
+```
+
+Supervisor
+```scala
+  override val supervisorStrategy: SupervisorStrategy =
+    AllForOneStrategy(
+      maxNrOfRetries = 5,
+      withinTimeRange = 1.minute,
+      loggingEnabled = true
+    )(SupervisorStrategy.defaultDecider)
+
+  private val router: Router = {
+    Router(RoundRobinRoutingLogic(), routees)
+  }
+  private var routees = createRoutees()
+  private var splitterRef: ActorRef = _
+  
+  private def createRoutees(): IndexedSeq[ActorRefRoutee] = {
+    var result = IndexedSeq.empty[ActorRefRoutee]
+
+    val printer = context.actorOf(StringPrinter.props(), workerName())
+    val joiner = context.actorOf(StringJoiner.props(printer), workerName())
+    val lowercaserAndSwapper = context.actorOf(StringLowercaserAndSwapper.props(joiner), workerName())
+    val splitter = context.actorOf(StringSplitter.props(lowercaserAndSwapper), workerName())
+    splitterRef = splitter
+```
+
+That task is similar to the previous one, the only differences are that I change the supervision strategy to 'AllForOneStrategy' which means when any actor dies, all actors will be eventually restarted. When I create new routees, I pass to each one of them the ActorRef to the Actor they should message next. 
+
+## P0W5 - May the Web be with you
+
+**Task1** -- *Minimal Task* - Write an application that would visit [this link](https://quotes.toscrape.com/). Print out the HTTP response
+status code, response headers and response body.
+
+PageVisitor actor
+```scala
+val responseFuture: Future[HttpResponse] = Http().singleRequest(
+  HttpRequest(uri = page, method = HttpMethods.GET))
+
+  responseFuture
+    .onComplete {
+       case Success(res) =>
+         log.info("Response: {}", res)
+         Unmarshal(res.entity).to[String]
+          .onComplete {
+            case Success(htmlString) =>
+              log.info("Page {} visited successfully", page)
+              log.info("Body: {}", htmlString)
+
+              case Failure(_) => sys.error("something wrong")
+          }
+         case Failure(_) => sys.error("Failed to send HTTP request")
+   }
+```
+
+That task introduced me into the world of web scraping. To finish the task, I sent a single GET request to the specified link as a future, because the response can not be currently available when the request is made. When a response is available, the HttpResponse is caught and deserialised into a String and printed in the console.
+
+
+**Task2** -- *Minimal Task* - Continue your previous application. Extract all quotes from the HTTP
+response body. Collect the author of the quote, the quote text and tags. Save the data
+into a list of maps, each map representing a single quote
+
+
+```scala
+val quotes = Jsoup.parse(htmlString).select("div.quote")
+quotes.forEach(
+  quote => {
+  val quoteText = quote.select("span.text").text()
+  val quoteAuthor = quote.select("small.author").text()
+  val quoteTags = quote.select("div.tags a.tag").eachText().asScala.toList
+
+  val quoteClass = new QuoteClass(quoteText, quoteAuthor, quoteTags)
+  val quoteMap = HashMap[String, QuoteClass]()
+  quoteMap.put(quoteText, quoteClass)
+  listQuotes += quoteMap 
+  })
+```
+
+Here I had to continue my previous task and to extract all the quotes from the response and insert the quote, author and related tags into a list of maps. For that I used a library called "Jsoup" which is a HTML parser, retrieved all the 'quote' divs and processed each of them. 
+
+**Task3** -- *Minimal Task* - Continue your previous application. Persist the list of quotes into a file.
+Encode the data into JSON format. Name the file quotes.json.
+
+```scala
+val mapper = new ObjectMapper().registerModule(DefaultScalaModule);
+val jsonString = mapper.writeValueAsString(listQuotes)
+val jsonFile = new java.io.File("src/main/scala/week5/quotes/quotes.json")
+mapper.writeValue(jsonFile, jsonString)
+```
+
+For that task I used Jackson ObjectMapper, which is a JSON serialization/deserialization library. I took the whole list of quotes and wrote them into a jsonFile. 
+
+**Task4** -- *Main Task* - Write an application that would implement a Star Wars-themed RESTful API.
+The API should implement the following HTTP methods:
+
+* GET /movies
+* GET /movies/:id
+* POST /movies
+* PUT /movies/:id
+* PATCH /movies/:id
+* DELETE /movies/:id
+
+Use a database to persist your data.
+
+StarWarsRepository
+```scala
+  private val mapper = new ObjectMapper().registerModule(DefaultScalaModule);
+  private val jedis = new Jedis("localhost", 6379)
+  seedJedis()
+  
+   override def receive: Receive = {
+    case GetMovies =>
+      val moviesJson = jedis.lrange("movies", 0, -1).asScala
+      sender() ! moviesJson.toList
+    case GetMovies(id) =>
+      val moviesJson = jedis.lrange("movies", 0, -1).asScala
+      val movie = moviesJson.toList
+        .map(mapper.readValue(_, classOf[Movie]))
+        .find(_.id == id)
+
+      val movieJson = Option[Movie](movie.get).map(mapper.writeValueAsString(_))
+
+      sender() ! movieJson
+
+    case PostMovies(movie) =>
+      jedis.lpush("movies",
+        mapper.writeValueAsString(movie),
+      )
+      sender() ! "Movie added"
+```
+
+StarWarsAPI
+```scala
+Http().newServerAt(host, port).bind(routes)
+
+def routes: Route =
+    pathPrefix("movies") {
+      pathEnd {
+        get {
+          val allMovies: Future[List[String]] = (starWarsRepository ? StarWarsRepository.GetMovies).mapTo[List[String]]
+          onSuccess(allMovies) { movies =>
+            complete(HttpEntity(ContentTypes.`application/json`, movies.toString()))
+          }
+        } ~
+          post {
+            entity(as[Movie]) { movie =>
+              val movieAdded: Future[String] = (starWarsRepository ? StarWarsRepository.PostMovies(movie)).mapTo[String]
+              onComplete(movieAdded) { _ =>
+                complete(StatusCodes.Created)
+              }
+            }
+          } ~
+          get {
+            parameters("id".as[Int]) { id =>
+              log.info(s"Get movie with id: $id")
+              val movie: Future[Option[String]] = (starWarsRepository ? StarWarsRepository.GetMovies(id.toInt)).mapTo[Option[String]]
+              onSuccess(movie) {
+                case Some(movie) => complete(HttpEntity(ContentTypes.`application/json`, movie))
+                case None => complete(StatusCodes.NotFound)
+              }
+            }
+          }
+      }
+
+```
+
+In the main task, I had to implement a themed StarWars RESTful API with all CRUD endpoints. I didn't include all the endpoints to not make the report overbloated. In the StarWarsAPI, I open a new server and assign the following routes to it and it is ready to listen to incoming requests. Requests were made using Postman. I define some routes with the 'movies' prefix, to some requests I add query parameters, to others a request body. The request is forwarded to the repository. In the repository, as a storage I used Jedis which is Java client for Redis, create a docker container with 6379 port and it should work. Use 'docker run -p 6379:6379 -it redis/redis-stack:latest'.
 
 ## Conclusion
 
 The first two weeks of the laboratory work nr. 1 are a introduction to the Scala language, by solving problems we get familiar with the language. 
 The third week made me familiar with the actor model, each task slowly explains how things work, how messages are passed between actors, how the internal state is handled, how actors can watch other actors and be notfied. 
+The fourth week taught me about actor supervision and different supervision strategies. 
+The fifth week taught me about web scraping and how to make a REST API using actors and how to handle incoming requests and responses. 
 
 ## Bibliography
 
@@ -725,3 +901,9 @@ https://docs.scala-lang.org/getting-started/intellij-track/getting-started-with-
 https://developer.lightbend.com/guides/akka-quickstart-scala/index.html
 
 https://doc.akka.io/docs/akka/current/typed/guide/introduction.html
+
+https://github.com/redis/jedis
+
+https://jsoup.org/
+
+https://doc.akka.io/docs/akka-http/current/introduction.html?_ga=2.122991691.1998798118.1677997811-1718736475.1676137804
