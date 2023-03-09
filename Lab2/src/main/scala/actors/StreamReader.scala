@@ -11,12 +11,12 @@ import akka.stream.scaladsl.Sink
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 
-class StreamReader(uriAddress: String, printer: ActorRef) extends Actor with ActorLogging {
+class StreamReader(uriAddress: String, router: ActorRef) extends Actor with ActorLogging {
   implicit val system = context.system
   implicit val dispatcher = context.dispatcher
   implicit val requestTimeout = akka.util.Timeout(5.second)
 
-  private val tweetPrinter = printer
+  private val tweetRouter = router
   log.info(s"StreamReader actor created for $uriAddress")
   override def receive: Receive = {
     case Send =>
@@ -51,7 +51,7 @@ class StreamReader(uriAddress: String, printer: ActorRef) extends Actor with Act
         responseFuture.foreach(serverSentEvent => serverSentEvent.foreach(
           event => {
             val tweetData = event.getData()
-            tweetPrinter ! TweetPrinter.PrintTweet(tweetData)
+            tweetRouter ! TweetRouter.PrintTweet(tweetData)
           }
         ))
 
