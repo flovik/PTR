@@ -8,6 +8,7 @@ import io.circe.parser._
 
 import scala.concurrent.duration.FiniteDuration
 class TweetPrinter(sleepTime: FiniteDuration) extends Actor with ActorLogging {
+  log.info(s"TweetPrinter actor created with sleep time of $sleepTime")
   override def receive: Receive = {
     case PrintTweet(tweet) =>
       val mappedTweet = parse(tweet).getOrElse(Json.Null)

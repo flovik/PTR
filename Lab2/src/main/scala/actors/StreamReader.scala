@@ -17,6 +17,7 @@ class StreamReader(uriAddress: String, printer: ActorRef) extends Actor with Act
   implicit val requestTimeout = akka.util.Timeout(5.second)
 
   private val tweetPrinter = printer
+  log.info(s"StreamReader actor created for $uriAddress")
   override def receive: Receive = {
     case Send =>
       // set up an HTTP event stream (using Server-Sent Events) to receive tweets
