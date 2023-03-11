@@ -2,16 +2,16 @@ package actors
 
 import actors.TweetRouter.{AddRoutee, PrintTweet, ReceiveRoutees, RemoveRoutee}
 import akka.actor.{Actor, ActorLogging, Props}
-import akka.routing.{ActorRefRoutee, RoundRobinRoutingLogic, Router}
+import akka.routing.{ActorRefRoutee, RoundRobinRoutingLogic, Router, SmallestMailboxRoutingLogic}
 
 class TweetRouter extends Actor with ActorLogging {
   private var router: Router = {
-    Router(RoundRobinRoutingLogic())
+    Router(SmallestMailboxRoutingLogic())
+    // tries to an actor with fewest messages in mailbox
   }
 
   override def receive: Receive = {
     case PrintTweet(tweet) =>
-      log.info("Broadcasting message with round robin logic")
       router.route(TweetPrinter.PrintTweet(tweet), sender())
     case ReceiveRoutees(routees) =>
       log.info("Received routees")

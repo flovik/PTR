@@ -2,11 +2,12 @@ package actors
 
 import actors.TweetPrinter.PrintTweet
 import akka.actor.{Actor, ActorLogging, Props}
-import objects.{Message, Tweet, TweetResponse}
 import io.circe._
 import io.circe.parser._
+import objects.{Message, Tweet, TweetResponse}
 
 import scala.concurrent.duration.FiniteDuration
+import scala.util.Random
 class TweetPrinter(sleepTime: FiniteDuration) extends Actor with ActorLogging {
   log.info(s"TweetPrinter actor created with sleep time of $sleepTime")
   override def receive: Receive = {
@@ -17,8 +18,9 @@ class TweetPrinter(sleepTime: FiniteDuration) extends Actor with ActorLogging {
         TweetResponse(Message(Tweet(tweet.getOrElse(""))))
       }.getOrElse(TweetResponse(Message(Tweet(""))))
 
+      if (tweetParsed.message.tweet.text.contains("kill")) throw new Exception("Killed by tweet")
       log.info(s"${tweetParsed.message.tweet.text}")
-      Thread.sleep(sleepTime.toMillis)
+      Thread.sleep(Random.between(30, 450) +  sleepTime.toMillis)
   }
 
 
