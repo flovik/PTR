@@ -8,7 +8,7 @@ object Main {
     val tweets1 = "http://localhost:4000/tweets/1"
     val tweets2 = "http://localhost:4000/tweets/2"
 
-//    val printerActor = system.actorOf(TweetPrinter.props(30.milliseconds), "TweetPrinter")
+    // val printerActor = system.actorOf(TweetPrinter.props(30.milliseconds), "TweetPrinter")
 
     val router = system.actorOf(TweetRouter.props, "TweetRouter")
     val supervisor = system.actorOf(TweetPrinterSupervisor.props(router), "TweetPrinterSupervisor")
