@@ -179,10 +179,10 @@ message”. Change the actor to crash when such a message is received. Of course
 trigger the supervisor to restart the crashed actor.
 
 ```scala
-if (tweetParsed.message.tweet.text.contains("kill")) throw new Exception("Killed by tweet")
+if (mappedTweet.isNull) throw new Exception("Killed by tweet")
 ```
 
-&nbsp;&nbsp;&nbsp;&nbsp; The exception will kill the actor and make the supervisor restart it. 
+&nbsp;&nbsp;&nbsp;&nbsp; The incoming 'kill' message cannot be parsed and returns Null, which makes the actor to be restarted by the supervisor. 
 
 **Task 4** -- *Bonus Task* - Continue your Load Balancer actor. Modify the actor to implement the “Least
 connected” algorithm for load balancing (or other interesting algorithm). Refer to [this article](https://blog.envoyproxy.io/examining-load-balancing-algorithms-with-envoy-1be643ea121c)
@@ -211,7 +211,7 @@ It tries to send a message to the actor with fewest messages in mailbox.
 
 In the first week, I learnt how to send requests to a docker container and receive Server Sent Events and handle them.
 
-In the second week, I learnt how to change Routing logic of the Router to manage the load balacing of the system. 
+In the second week, I learnt how to change Routing logic of the Router to manage the load balancing of the system. 
 
 ## Bibliography
 
