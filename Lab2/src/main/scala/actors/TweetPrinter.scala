@@ -9,18 +9,29 @@ import objects.{Message, Tweet, TweetResponse}
 import scala.concurrent.duration.FiniteDuration
 import scala.util.Random
 class TweetPrinter(sleepTime: FiniteDuration) extends Actor with ActorLogging {
-  log.info(s"TweetPrinter actor created with sleep time of $sleepTime")
+//  log.info(s"TweetPrinter actor created with sleep time of $sleepTime")
   override def receive: Receive = {
     case PrintTweet(tweet) =>
       val mappedTweet = parse(tweet).getOrElse(Json.Null)
+
+      //the panic message cannot be parsed and returns null
+      if (mappedTweet.isNull) throw new Exception("Killed by tweet")
+
       val tweetParsed = mappedTweet.asObject.map { obj =>
-        val tweet = obj.toMap.get("message").flatMap(_.asObject).flatMap(_.toMap.get("tweet")).flatMap(_.asObject).flatMap(_.toMap.get("text")).flatMap(_.asString)
+        val tweet = obj
+          .toMap
+          .get("message")
+          .flatMap(_.asObject)
+          .flatMap(_.toMap.get("tweet"))
+          .flatMap(_.asObject)
+          .flatMap(_.toMap.get("text"))
+          .flatMap(_.asString)
+
         TweetResponse(Message(Tweet(tweet.getOrElse(""))))
       }.getOrElse(TweetResponse(Message(Tweet(""))))
 
-      if (tweetParsed.message.tweet.text.contains("kill")) throw new Exception("Killed by tweet")
       log.info(s"${tweetParsed.message.tweet.text}")
-      Thread.sleep(Random.between(30, 450) +  sleepTime.toMillis)
+      Thread.sleep(Random.between(10, 50) +  sleepTime.toMillis)
   }
 
 
